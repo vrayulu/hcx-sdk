@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.hcxprotocol.createresource.HCXInsurancePlan;
+import org.fhir.ucum.Value;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
@@ -57,6 +58,18 @@ public class HCXFHIRValidator {
         StructureDefinition sdClaim = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-Claim.json").openStream());
         StructureDefinition sdNRCESPatient = (StructureDefinition) parser.parseResource(new URL(nrcesIGBasePath + "StructureDefinition-Patient.json").openStream());
         StructureDefinition sdInsurancePlan = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXInsurancePlan.json").openStream());
+        StructureDefinition sdHCXProofOfIdentificationExtension = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXProofOfIdentificationExtension.json").openStream());
+        StructureDefinition sdHCXProofOfPresenceExtension = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXProofOfPresenceExtension.json").openStream());
+        StructureDefinition sdHCXDiagnosticDocumentsExtension = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXDiagnosticDocumentsExtension.json").openStream());
+        StructureDefinition sdHCXInformationalMessagesExtension = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXInformationalMessagesExtension.json").openStream());
+        StructureDefinition sdHCXQuestionnairesExtension = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXQuestionnairesExtension.json").openStream());
+
+        //adding the value sets
+        ValueSet vsProofOfIdentity = (ValueSet) parser.parseResource(new URL(hcxIGBasePath + "ValueSet-proof-of-identity-codes.json").openStream());
+        ValueSet vsProofOfPresence = (ValueSet) parser.parseResource(new URL(hcxIGBasePath + "ValueSet-proof-of-presence-codes.json").openStream());
+        ValueSet vsClinicalDiagnostics = (ValueSet) parser.parseResource(new URL(hcxIGBasePath + "ValueSet-clinical-diagnostics-document-codes.json").openStream());
+        ValueSet vsInformationalMessages = (ValueSet) parser.parseResource(new URL(hcxIGBasePath + "ValueSet-informational-messages-codes.json").openStream());
+
 
         // Create a PrePopulatedValidationSupport which can be used to load custom definitions.
         PrePopulatedValidationSupport prePopulatedSupport = new PrePopulatedValidationSupport(fhirContext);
@@ -65,6 +78,15 @@ public class HCXFHIRValidator {
         prePopulatedSupport.addStructureDefinition(sdClaim);
         prePopulatedSupport.addStructureDefinition(sdNRCESPatient);
         prePopulatedSupport.addStructureDefinition(sdInsurancePlan);
+        prePopulatedSupport.addStructureDefinition(sdHCXProofOfIdentificationExtension);
+        prePopulatedSupport.addStructureDefinition(sdHCXProofOfPresenceExtension);
+        prePopulatedSupport.addStructureDefinition(sdHCXDiagnosticDocumentsExtension);
+        prePopulatedSupport.addStructureDefinition(sdHCXInformationalMessagesExtension);
+        prePopulatedSupport.addStructureDefinition(sdHCXQuestionnairesExtension);
+        prePopulatedSupport.addValueSet(vsClinicalDiagnostics);
+        prePopulatedSupport.addValueSet(vsInformationalMessages);
+        prePopulatedSupport.addValueSet(vsProofOfPresence);
+        prePopulatedSupport.addValueSet(vsProofOfIdentity);
 
         // Add the custom definitions to the chain
         supportChain.addValidationSupport(prePopulatedSupport);
@@ -90,21 +112,6 @@ public class HCXFHIRValidator {
 
         try {
             FhirValidator validator = HCXFHIRValidator.getValidator();
-            
-            CoverageEligibilityRequest cer = new CoverageEligibilityRequest();
-            cer.setId(UUID.randomUUID().toString()); 
-            cer.setStatus(CoverageEligibilityRequest.EligibilityRequestStatus.ACTIVE);
-            cer.addPurpose(CoverageEligibilityRequest.EligibilityRequestPurpose.DISCOVERY);
-            cer.setCreated(new Date());
-
-            /*Patient patientResource = new Patient();
-            patientResource.setId("P1001");
-            patientResource.addName().setFamily("Simpson").addGiven("Homer");
-            patientResource.setGender(Enumerations.AdministrativeGender.MALE);
-
-            Reference patientRef = new Reference();
-            patientRef.setResource(patientResource);
-            cer.setPatient(patientRef);*/
 
             //creating a new HCXInsurancePlan object and validating it against the HCX SD
 
@@ -114,23 +121,24 @@ public class HCXFHIRValidator {
             Meta meta = new Meta();
             meta.setProfile(Collections.singletonList(new CanonicalType("https://ig.hcxprotocol.io/v0.7/StructureDefinition-HCXInsurancePlan.html")));
             ip.setMeta(meta);
-            //ip.setMeta(new Meta().setProfile((List<CanonicalType>) new CanonicalType("https://ig.hcxprotocol.io/v0.7/StructureDefinition-HCXInsurancePlan.html")));
-            //ip.setIdentifier((List<Identifier>) new Identifier().setValue("AB_GUJ_Plan1"));
             ip.getIdentifier().add(new Identifier().setValue("AB_GUJ_Plan1"));
             ip.setStatus(Enumerations.PublicationStatus.ACTIVE);
             ip.setType(Collections.singletonList(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("medical").setSystem("http://terminology.hl7.org/CodeSystem/insurance-plan-type")))));
             ip.setName("PMJAY-Mukhyamantri Amrutam & Mukhyamantri Vatsalya");
 
+            //Creating the Identification Extension Object
             HCXInsurancePlan.IdentificationExtension ext = new HCXInsurancePlan.IdentificationExtension();
             ext.setProofOfIdDocumentCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/proofOfIdentificationDocumentCodes").setCode("12345").setDisplay("Aadhar Card").setVersion("1.0.0")));
             ext.setDocumentationUrl(new UrlType("http://documentation-url"));
             ext.setClinicalDiagnosticDocumentClaimUse(new CodeType("preauthorization"));
-//            ip.setIdentificationExtension(ext);
+
+            //Creating Presence Extension Object
             HCXInsurancePlan.PresenceExtension ext1 = new HCXInsurancePlan.PresenceExtension();
             ext1.setProofOfPresenceDocumentCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/proofOfPresenceDocumentCodes").setCode("12345").setVersion("1.0.0").setDisplay("Aadhar Verification XML")));
             ext1.setDocumentationUrl(new UrlType("http://documentation-url"));
             ext1.setClinicalDiagnosticDocumentClaimUse(new CodeType("preauthorization"));
 
+            //Adding the above extensions to Insurance Plan Object
             HCXInsurancePlan.InsurancePlanPlanComponent plan = new HCXInsurancePlan.InsurancePlanPlanComponent();
             plan.setId(UUID.randomUUID().toString());
             plan.setIdentificationExtension(ext);
@@ -182,21 +190,9 @@ public class HCXFHIRValidator {
 
             System.out.println("here is the json " + messageString);
 
-//            ValidationResult result = validator.validateWithResult(cer);
-//            for (SingleValidationMessage next : result.getMessages()) {
-//                System.out.println(next.getLocationString() + " -- " + next.getMessage());
-//            }
-//
-//            Claim claim = new Claim();
-//            claim.setId(UUID.randomUUID().toString());
-//            ValidationResult result = validator.validateWithResult(claim);
-//            for (SingleValidationMessage next : result.getMessages()) {
-//                System.out.println(next.getLocationString() + " -- " + next.getMessage());
-//            }
-
             ValidationResult result1 = validator.validateWithResult(ip);
             for (SingleValidationMessage next : result1.getMessages()) {
-                System.out.println(next.getLocationString() + " -- " + next.getMessage());
+                System.out.println(next.getSeverity() + " -- " + next.getLocationString() + " -- " + next.getMessage());
             }
 
         } catch (Exception e) {
