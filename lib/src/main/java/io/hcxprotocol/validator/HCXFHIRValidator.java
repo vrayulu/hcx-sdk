@@ -1,21 +1,19 @@
 package io.hcxprotocol.validator;
 
 import java.net.URL;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
+import io.hcxprotocol.createresource.HCXInsurancePlan;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.PrePopulatedValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
-import org.hl7.fhir.r4.model.Claim;
-import org.hl7.fhir.r4.model.CoverageEligibilityRequest;
-import org.hl7.fhir.r4.model.Enumerations;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Reference;
-import org.hl7.fhir.r4.model.StructureDefinition;
+import org.hl7.fhir.r4.model.*;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
@@ -32,8 +30,9 @@ public class HCXFHIRValidator {
 
     private HCXFHIRValidator() throws Exception {
         FhirContext fhirContext = FhirContext.forR4();
-
+        fhirContext.setDefaultTypeForProfile("https://ig.hcxprotocol.io/v0.7/StructureDefinition-HCXInsurancePlan.html", HCXInsurancePlan.class);
         // Create a chain that will hold the validation modules
+        System.out.println("we have started");
         ValidationSupportChain supportChain = new ValidationSupportChain();
 
         // DefaultProfileValidationSupport supplies base FHIR definitions. This is generally required
@@ -57,6 +56,7 @@ public class HCXFHIRValidator {
         StructureDefinition sdCoverageEligibilityResponse = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-CoverageEligibilityResponse.json").openStream());
         StructureDefinition sdClaim = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-Claim.json").openStream());
         StructureDefinition sdNRCESPatient = (StructureDefinition) parser.parseResource(new URL(nrcesIGBasePath + "StructureDefinition-Patient.json").openStream());
+        StructureDefinition sdInsurancePlan = (StructureDefinition) parser.parseResource(new URL(hcxIGBasePath + "StructureDefinition-HCXInsurancePlan.json").openStream());
 
         // Create a PrePopulatedValidationSupport which can be used to load custom definitions.
         PrePopulatedValidationSupport prePopulatedSupport = new PrePopulatedValidationSupport(fhirContext);
@@ -64,6 +64,7 @@ public class HCXFHIRValidator {
         prePopulatedSupport.addStructureDefinition(sdCoverageEligibilityResponse);
         prePopulatedSupport.addStructureDefinition(sdClaim);
         prePopulatedSupport.addStructureDefinition(sdNRCESPatient);
+        prePopulatedSupport.addStructureDefinition(sdInsurancePlan);
 
         // Add the custom definitions to the chain
         supportChain.addValidationSupport(prePopulatedSupport);
@@ -105,15 +106,96 @@ public class HCXFHIRValidator {
             patientRef.setResource(patientResource);
             cer.setPatient(patientRef);*/
 
-            ValidationResult result = validator.validateWithResult(cer);
-            for (SingleValidationMessage next : result.getMessages()) {
-                System.out.println(next.getLocationString() + " -- " + next.getMessage());
-            }
+            //creating a new HCXInsurancePlan object and validating it against the HCX SD
 
-            Claim claim = new Claim();
-            claim.setId(UUID.randomUUID().toString());
-            result = validator.validateWithResult(claim);
-            for (SingleValidationMessage next : result.getMessages()) {
+            HCXInsurancePlan ip =  new HCXInsurancePlan();;
+
+            ip.setId(UUID.randomUUID().toString());
+            Meta meta = new Meta();
+            meta.setProfile(Collections.singletonList(new CanonicalType("https://ig.hcxprotocol.io/v0.7/StructureDefinition-HCXInsurancePlan.html")));
+            ip.setMeta(meta);
+            //ip.setMeta(new Meta().setProfile((List<CanonicalType>) new CanonicalType("https://ig.hcxprotocol.io/v0.7/StructureDefinition-HCXInsurancePlan.html")));
+            //ip.setIdentifier((List<Identifier>) new Identifier().setValue("AB_GUJ_Plan1"));
+            ip.getIdentifier().add(new Identifier().setValue("AB_GUJ_Plan1"));
+            ip.setStatus(Enumerations.PublicationStatus.ACTIVE);
+            ip.setType(Collections.singletonList(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("medical").setSystem("http://terminology.hl7.org/CodeSystem/insurance-plan-type")))));
+            ip.setName("PMJAY-Mukhyamantri Amrutam & Mukhyamantri Vatsalya");
+
+            HCXInsurancePlan.IdentificationExtension ext = new HCXInsurancePlan.IdentificationExtension();
+            ext.setProofOfIdDocumentCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/proofOfIdentificationDocumentCodes").setCode("12345").setDisplay("Aadhar Card").setVersion("1.0.0")));
+            ext.setDocumentationUrl(new UrlType("http://documentation-url"));
+            ext.setClinicalDiagnosticDocumentClaimUse(new CodeType("preauthorization"));
+//            ip.setIdentificationExtension(ext);
+            HCXInsurancePlan.PresenceExtension ext1 = new HCXInsurancePlan.PresenceExtension();
+            ext1.setProofOfPresenceDocumentCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/proofOfPresenceDocumentCodes").setCode("12345").setVersion("1.0.0").setDisplay("Aadhar Verification XML")));
+            ext1.setDocumentationUrl(new UrlType("http://documentation-url"));
+            ext1.setClinicalDiagnosticDocumentClaimUse(new CodeType("preauthorization"));
+
+            HCXInsurancePlan.InsurancePlanPlanComponent plan = new HCXInsurancePlan.InsurancePlanPlanComponent();
+            plan.setId(UUID.randomUUID().toString());
+            plan.setIdentificationExtension(ext);
+            plan.setPresenceExtension(ext1);
+            plan.setType(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("PMJAY_GUJ_GOLD_CARD").setSystem("http://terminologyServer/ValueSets/plan-type"))));
+
+            //specific cost
+            InsurancePlan.InsurancePlanPlanSpecificCostComponent spc = new InsurancePlan.InsurancePlanPlanSpecificCostComponent();
+            spc.setCategory(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("Inpatient-packages").setSystem("http://terminologyServer/ValueSets/cost-category"))));
+
+
+            //specific cost benefit component
+            HCXInsurancePlan.PlanBenefitComponent pbf = new HCXInsurancePlan.PlanBenefitComponent();
+            pbf.setType(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("HBP_PACKAGE_00003").setSystem("http://terminologyServer/ValueSets/packages"))));
+
+            //adding extensions to benefit component
+            HCXInsurancePlan.DiagnosticDocumentsExtension dde =  new HCXInsurancePlan.DiagnosticDocumentsExtension();
+            dde.setClinicalDiagnosticDocumentCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/proofOfIdentificationDocumentCodes").setCode("MAND0001").setVersion("1.0.0").setDisplay("Post Treatment clinical photograph")));
+            dde.setDocumentationUrl(new UrlType("http://documentation-url"));
+            dde.setClinicalDiagnosticDocumentClaimUse(new CodeType("claim"));
+
+            HCXInsurancePlan.InformationalMessagesExtension ime =  new HCXInsurancePlan.InformationalMessagesExtension();
+            ime.setInformationalMessagesCode(new CodeableConcept(new Coding().setSystem("https://hcx-valuesets/InformationalMessagesCodes").setCode("12343").setVersion("1.0.0").setDisplay("Information Message 1")));
+            ime.setDocumentationUrl(new UrlType("http://documntation-url"));
+            ime.setInformationalMessageClaimUse(new CodeType("claim"));
+
+            HCXInsurancePlan.QuestionnairesExtension qe = new HCXInsurancePlan.QuestionnairesExtension();
+            qe.setQuestionnaire(new Reference("Questionnnaire/1"));
+            qe.setDocumentationUrl(new UrlType("http://documentation-url"));
+            qe.setQuestionnaireClaimUse(new CodeType("claim"));
+
+            pbf.setDiagnosticDocumentsExtension(dde);
+            pbf.setInformationalMessagesExtension(ime);
+            pbf.setQuestionnairesExtension(qe);
+
+
+            InsurancePlan.PlanBenefitCostComponent pbc =  new InsurancePlan.PlanBenefitCostComponent();
+            pbc.setType(new CodeableConcept().setCoding(Collections.singletonList(new Coding().setCode("hospitalization").setSystem("http://terminologyServer/ValueSets/pacakgeCostTypes"))));
+
+            pbf.getCost().add(pbc);
+            spc.getBenefit().add(pbf);
+
+            plan.getSpecificCost().add(spc);
+            ip.getPlan().add(plan);
+
+
+            IParser p = FhirContext.forR4().newJsonParser().setPrettyPrint(true);
+            String messageString = p.encodeResourceToString(ip);
+
+            System.out.println("here is the json " + messageString);
+
+//            ValidationResult result = validator.validateWithResult(cer);
+//            for (SingleValidationMessage next : result.getMessages()) {
+//                System.out.println(next.getLocationString() + " -- " + next.getMessage());
+//            }
+//
+//            Claim claim = new Claim();
+//            claim.setId(UUID.randomUUID().toString());
+//            ValidationResult result = validator.validateWithResult(claim);
+//            for (SingleValidationMessage next : result.getMessages()) {
+//                System.out.println(next.getLocationString() + " -- " + next.getMessage());
+//            }
+
+            ValidationResult result1 = validator.validateWithResult(ip);
+            for (SingleValidationMessage next : result1.getMessages()) {
                 System.out.println(next.getLocationString() + " -- " + next.getMessage());
             }
 
